@@ -85,14 +85,6 @@ def act_fn_rnno(X):
 
 
 def _make_net(lam, warmstart, rnn_w, rnn_d, lin_w, lin_d, layernorm, celltype, rnno):
-
-    dry_run = not ring.ml.on_cluster()
-    if dry_run:
-        rnn_w = 10
-        rnn_d = 1
-        lin_w = 10
-        lin_d = 0
-
     if rnno:
         kwargs = {
             "forward_factory": ring.ml.rnno_v1.rnno_v1_forward_factory,
