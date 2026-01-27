@@ -3,7 +3,9 @@
 
 2) `pip install imt-ring imt-diodem fire`
 
-3) `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+3) `pip install git+https://github.com/simon-bachhuber/imt_benchmark`
+
+4) `pip install torch --index-url https://download.pytorch.org/whl/cpu`
 
 ### Bug: `scipy.sparse` throws `CircularImportError`
 
