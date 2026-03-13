@@ -1,0 +1,17 @@
+[project]
+name = "ring-dev"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "numpy",
+    "qmt",
+    "fire",
+    "wandb",
+    "tqdm",
+    "tsfast @ file:///Users/daniel/Development/tsfast",
+    "torch-optimizer",
+]
+
+[tool.setuptools]
+py-modules = []
