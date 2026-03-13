@@ -1,17 +1,20 @@
 [project]
-name = "ring-dev"
+name = "ring-tsfast"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "torch",
     "numpy",
     "qmt",
-    "fire",
-    "wandb",
-    "tqdm",
-    "tsfast @ file:///Users/daniel/Development/tsfast",
+    "tsfast",
     "torch-optimizer",
 ]
+
+[project.optional-dependencies]
+jax = ["imt-ring", "fire", "wandb"]
+
+[tool.uv.sources]
+tsfast = { path = "../tsfast", editable = true }
 
 [tool.setuptools]
 py-modules = []
