@@ -6,3 +6,5 @@ data/*
 pmap.py
 *.mp4
 *.onnx
+ring_data
+ring_data_h5
