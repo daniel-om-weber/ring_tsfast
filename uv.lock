@@ -13,6 +13,9 @@ resolution-markers = [
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
+[manifest]
+excludes = ["onnxruntime"]
+
 [[package]]
 name = "absl-py"
 version = "2.4.0"
@@ -818,6 +821,14 @@ wheels = [
 ]
 
 [[package]]
+name = "flatbuffers"
+version = "25.12.19"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4", size = 26661, upload-time = "2025-12-19T23:16:13.622Z" },
+]
+
+[[package]]
 name = "flax"
 version = "0.12.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1161,6 +1172,35 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6c/e6/7bf14eeb8f8b7251141944835abd42eb20a658d89084b7e1f3e5fe394090/imagesize-2.0.0.tar.gz", hash = "sha256:8e8358c4a05c304f1fccf7ff96f036e7243a189e9e42e90851993c558cfe9ee3", size = 1773045, upload-time = "2026-03-03T14:18:29.941Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5f/53/fb7122b71361a0d121b669dcf3d31244ef75badbbb724af388948de543e2/imagesize-2.0.0-py2.py3-none-any.whl", hash = "sha256:5667c5bbb57ab3f1fa4bc366f4fbc971db3d5ed011fd2715fd8001f782718d96", size = 9441, upload-time = "2026-03-03T14:18:27.892Z" },
+]
+
+[[package]]
+name = "imt-diodem"
+version = "1.1.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dm-tree" },
+    { name = "imt-tree-utils" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "qmt" },
+    { name = "requests" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/73/2f/1610f8a896db6f42642455fb1ce3d505439e5273cc041d1bc2416a6c54ff/imt_diodem-1.1.10.tar.gz", hash = "sha256:31dff16c4d24f02094b3b076eacc663b90a1a81efcf4145f6f7d43e5593435b5", size = 39581, upload-time = "2025-05-25T14:58:20.202Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/70/1c293f68114c253794d0b5bc07f0dd842fe02566bf3add53c51d204cbee3/imt_diodem-1.1.10-py3-none-any.whl", hash = "sha256:46c77936a1414674eec0162e8e566df49836c225b8c62bad159747f8bee44566", size = 39731, upload-time = "2025-05-25T14:58:17.476Z" },
+]
+
+[[package]]
+name = "imt-imt"
+version = "0.2.1"
+source = { git = "https://github.com/simon-bachhuber/imt.git#47e13735beb2c74e65e74deecd2092d09de70673" }
+dependencies = [
+    { name = "dm-tree" },
+    { name = "qmt" },
+    { name = "riann" },
+    { name = "scipy" },
 ]
 
 [[package]]
@@ -2130,6 +2170,28 @@ wheels = [
 ]
 
 [[package]]
+name = "onnxruntime-gpu"
+version = "1.24.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flatbuffers" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "protobuf" },
+    { name = "sympy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/fa/58ceca812214c9c1a286407c376e42e0b7de3e2c6e14b61cdf3caf6d6d9c/onnxruntime_gpu-1.24.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:537bdd6d95006a9200ae81f2e73ba9e621e723fdf0deb5901e2e62fb2cccf876", size = 252756089, upload-time = "2026-03-05T16:35:46.004Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/07/2f36920b513bd8939e25591153e37d9cfda94115bd119f2874da0750fce2/onnxruntime_gpu-1.24.3-cp312-cp312-win_amd64.whl", hash = "sha256:d72065b3ab5fdaef74d8b6b8f39b7ce20d89731610e3e63cb40e997d3dce177e", size = 207197001, upload-time = "2026-03-05T16:40:05.691Z" },
+    { url = "https://files.pythonhosted.org/packages/49/57/9e6206dac76e08f028d2ae95f2ab1b3a7c3317fb6c0374a530aad48dab5c/onnxruntime_gpu-1.24.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3242a70010934e5bb0aeaa9dde4c25c6c2da577b55c6308c0caa828ba3b7be23", size = 252753349, upload-time = "2026-03-05T16:35:58.09Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/ae/f0be395602c13a3a8d22fa6632133550a64536c58bc3623abbba5d0a575e/onnxruntime_gpu-1.24.3-cp313-cp313-win_amd64.whl", hash = "sha256:a423b164dbc26cb7f8736367b11698c2a7294748d3c144c39542ecac28d225c9", size = 207197331, upload-time = "2026-03-05T16:40:14.944Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/af/a64c9789769d8d7fabc6d35dcce2f2897b2d9e0fe113044efc2903f7cd07/onnxruntime_gpu-1.24.3-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9696d54974a1313ef0d87f4cbd04f9abfd13839194638d52bb5967a15615341d", size = 252762923, upload-time = "2026-03-05T16:36:10.043Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/bb/1cf7dffac2fb01e8de9f0882438165f7543f0aab57f86d1f587e6faa8528/onnxruntime_gpu-1.24.3-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b8ca744f40b33380bc9136988213e574c927d2b919ed42149977e006b138f74f", size = 252754914, upload-time = "2026-03-05T16:36:30.739Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/39/3949d56103bd9cd9381de59b060f9bce8dc2c7363f465bf207ebd0c7a5d0/onnxruntime_gpu-1.24.3-cp314-cp314-win_amd64.whl", hash = "sha256:c60c44e2b388720e6670a948b52626f3d089e960ef7da66e4fa6b2b33a11116f", size = 209599131, upload-time = "2026-03-05T16:40:24.074Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/60/51bfbcf2d0540dbfa426a73a9b80046b71a63de7303d16c0f2682c8edfd2/onnxruntime_gpu-1.24.3-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:29048407a2398361d93de5537c2d2079d79d720337a0743d4a2cc28db981e776", size = 252764115, upload-time = "2026-03-05T16:36:44.681Z" },
+]
+
+[[package]]
 name = "opt-einsum"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2951,8 +3013,8 @@ wheels = [
 
 [[package]]
 name = "qmt"
-version = "0.2.4"
-source = { registry = "https://pypi.org/simple" }
+version = "0.3.0"
+source = { git = "https://github.com/simon-bachhuber/qmt#fdb31607ae0aa09293a86774eb0ae5f8bcbb72cc" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
@@ -2965,7 +3027,6 @@ dependencies = [
     { name = "transplant" },
     { name = "vqf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/e0/df9cea0bfb4e702e9072ed9033c8c00ce52bdc9815852ca12717e95016e2/qmt-0.2.4.tar.gz", hash = "sha256:27fff51c04e4cf4441764623572fa84d8f3743411e24971c44273a28db0faedc", size = 1907865, upload-time = "2023-08-09T15:52:01.579Z" }
 
 [[package]]
 name = "rarfile"
@@ -3025,6 +3086,18 @@ socks = [
 ]
 
 [[package]]
+name = "riann"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/fd/e7d3df13a4aa20d1edab5c1157040680193b5eb2601a52be7d5743f7f037/riann-0.1.3.tar.gz", hash = "sha256:6a06235368c5c324c85378608e11c2e3d87790172ac87a2ec143fcdf7e9fc301", size = 1761339, upload-time = "2025-07-28T16:01:29.649Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/42/f7a53ecf56baa427eaba92837d6b35da8d0fd244bf73f35125a0009aa1e8/riann-0.1.3-py3-none-any.whl", hash = "sha256:a7d1ab5c820c57fa945637d3ab1195f2caac13dd6a62bd22d5ea81318d7e9f03", size = 1375569, upload-time = "2025-07-28T16:00:57.511Z" },
+]
+
+[[package]]
 name = "rich"
 version = "13.9.4"
 source = { registry = "https://pypi.org/simple" }
@@ -3050,6 +3123,12 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+imt = [
+    { name = "imt-diodem" },
+    { name = "imt-imt" },
+    { name = "onnxruntime-gpu" },
+    { name = "tensorrt-cu12" },
+]
 jax = [
     { name = "fire" },
     { name = "imt-ring" },
@@ -3059,15 +3138,19 @@ jax = [
 [package.metadata]
 requires-dist = [
     { name = "fire", marker = "extra == 'jax'" },
+    { name = "imt-diodem", marker = "extra == 'imt'" },
+    { name = "imt-imt", marker = "extra == 'imt'", git = "https://github.com/simon-bachhuber/imt.git" },
     { name = "imt-ring", marker = "extra == 'jax'" },
     { name = "numpy" },
+    { name = "onnxruntime-gpu", marker = "extra == 'imt'" },
     { name = "qmt" },
+    { name = "tensorrt-cu12", marker = "extra == 'imt'" },
     { name = "torch" },
     { name = "torch-optimizer" },
     { name = "tsfast", editable = "../tsfast" },
     { name = "wandb", marker = "extra == 'jax'" },
 ]
-provides-extras = ["jax"]
+provides-extras = ["jax", "imt"]
 
 [[package]]
 name = "rinoh-typeface-dejavuserif"
@@ -3599,6 +3682,33 @@ sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165, upload-time = "2024-07-05T07:25:29.591Z" },
 ]
+
+[[package]]
+name = "tensorrt-cu12"
+version = "10.15.1.29"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorrt-cu12-bindings" },
+    { name = "tensorrt-cu12-libs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/57/a7/c8d81de98428c7dd67b5b9df0e1ea21c497661b4703f946e8d84b39ad76e/tensorrt_cu12-10.15.1.29.tar.gz", hash = "sha256:d28acc4d14804cac0b50c0c1fc58c0d25cb974aa4c53cda5cfd8c4a4154c45fe", size = 19096, upload-time = "2026-01-30T07:44:47.652Z" }
+
+[[package]]
+name = "tensorrt-cu12-bindings"
+version = "10.15.1.29"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/a1/feb1b14806e9a5f486b2b69b41623b8eb15b18e86634c992f82a3a4bd3ae/tensorrt_cu12_bindings-10.15.1.29-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:627533cc801209887173b28137eb571e1cf52ecf2afb4c92c6cf29c41711f580", size = 1140872, upload-time = "2026-01-29T21:15:11.309Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/be/a37d45dc6cad228a4b02facec060ed9cc7808373d5b7f3d2e33ddbc9aeb2/tensorrt_cu12_bindings-10.15.1.29-cp312-none-win_amd64.whl", hash = "sha256:39b348cf0ffc548e928b1d180649f9cfbf37563b128fc81b59c172722dc9f1c3", size = 893027, upload-time = "2026-01-29T21:15:49.231Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/f4/96dfda7d2c1507cb4a52d5c439a91f8428053f068d3fffe003bfa58ac17f/tensorrt_cu12_bindings-10.15.1.29-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:b83e218d540f629d3fbc82904170839fa97c8fbd7fc280e0439ae147ea29df7d", size = 1140759, upload-time = "2026-01-29T21:14:48.812Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/28/c61fe9838061a05a2e652374f03eb2ba96b174086993667db7904bec5e22/tensorrt_cu12_bindings-10.15.1.29-cp313-none-win_amd64.whl", hash = "sha256:2dc3cf02ae8bdf8f078d7d95d9015d330835d47ef21d0b95a236fac56d0f301d", size = 893015, upload-time = "2026-01-29T21:15:13.898Z" },
+]
+
+[[package]]
+name = "tensorrt-cu12-libs"
+version = "10.15.1.29"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/b0/2306f25ea0893d0080091c75b5df55d5e0580183293b4839d66f1fcab457/tensorrt_cu12_libs-10.15.1.29.tar.gz", hash = "sha256:b2a4ad7d46e6f1a43bb413cd8efc8ecd511a365beccd75515db5f65dacab6119", size = 681, upload-time = "2026-01-29T21:13:21.179Z" }
 
 [[package]]
 name = "tensorstore"

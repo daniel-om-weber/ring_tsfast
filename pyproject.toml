@@ -12,9 +12,14 @@ dependencies = [
 
 [project.optional-dependencies]
 jax = ["imt-ring", "fire", "wandb"]
+imt = ["imt-imt", "imt-diodem", "onnxruntime-gpu", "tensorrt-cu12"]
+
+[tool.uv]
+exclude-dependencies = ["onnxruntime"]
 
 [tool.uv.sources]
 tsfast = { path = "../tsfast", editable = true }
+imt-imt = { git = "https://github.com/simon-bachhuber/imt.git" }
 
 [tool.setuptools]
 py-modules = []

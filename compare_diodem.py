@@ -1,0 +1,142 @@
+import ctypes
+import glob
+import os
+
+import torch
+
+torch.cuda.is_available()  # preload CUDA libs so onnxruntime can find them
+
+# Preload TensorRT libs (pip-installed, not on LD_LIBRARY_PATH)
+for _lib in sorted(glob.glob(os.path.join(os.path.dirname(__import__("tensorrt_libs").__file__), "*.so*"))):
+    try:
+        ctypes.CDLL(_lib, mode=ctypes.RTLD_GLOBAL)
+    except OSError:
+        pass
+
+import onnxruntime as ort  # noqa: E402
+
+# Make onnxruntime default to all GPU providers when none are specified
+_orig_init = ort.InferenceSession.__init__
+
+
+def _patched_init(self, path_or_bytes, sess_options=None, providers=None, provider_options=None, **kwargs):
+    if providers is None:
+        providers = ort.get_available_providers()
+    _orig_init(self, path_or_bytes, sess_options=sess_options, providers=providers, provider_options=provider_options, **kwargs)
+
+
+ort.InferenceSession.__init__ = _patched_init
+
+from diodem import load_data  # noqa: E402
+import fire  # noqa: E402
+import h5py  # noqa: E402
+import numpy as np  # noqa: E402
+
+# Required for torch.load to unpickle the saved model
+from train_rnno import RNNOModel, FeatureConfig  # noqa: F401, E402
+
+# Feature layout matching train_rnno.py FeatureConfig(joint_axes_1d=True, dt=True)
+# Per-segment: acc[0:3], gyr[3:6], ja_1d[6:9], dt[9:10]  → F=10, total=20
+F_PER_SEG = 10
+SL_ACC = slice(0, 3)
+SL_GYR = slice(3, 6)
+SL_DT = slice(9, 10)
+
+N_EXPERIMENTS = 5
+MOTIONS_PER_EXP = {1: 13, 2: 8, 3: 1, 4: 7, 5: 2}
+
+
+def _run_pair(model, acc_p, gyr_p, acc_i, gyr_i, Ts):
+    """Run our model on a single segment pair, return full (T, 8) output."""
+    T_len = acc_p.shape[0]
+    X = np.zeros((1, T_len, 2 * F_PER_SEG), dtype=np.float32)
+    X[0, :, SL_ACC] = acc_p
+    X[0, :, SL_GYR] = gyr_p
+    X[0, :, SL_DT] = Ts
+    off = F_PER_SEG
+    X[0, :, off + SL_ACC.start : off + SL_ACC.stop] = acc_i
+    X[0, :, off + SL_GYR.start : off + SL_GYR.stop] = gyr_i
+    X[0, :, off + SL_DT.start : off + SL_DT.stop] = Ts
+
+    x = torch.from_numpy(X).cuda()
+    with torch.no_grad():
+        pred, _ = model(x)
+    return pred[0].cpu().numpy()
+
+
+def _run_imt(method, acc_p, gyr_p, acc_i, gyr_i, Ts):
+    """Run an IMT method on a single segment pair, return (T, 4) quats."""
+    method.setTs(Ts)
+    method.reset()
+    qrel, _ = method.apply(
+        T=acc_p.shape[0],
+        acc1=acc_p, gyr1=gyr_p, mag1=None,
+        acc2=acc_i, gyr2=gyr_i, mag2=None,
+    )
+    return qrel
+
+
+def main(
+    save: str = "results.h5",
+    segments: list[str] = ["seg2", "seg3", "seg4", "seg5"],
+    Ts: float = 0.01,
+    warmup: float = 5,
+    model_path: str = "rnno_final_v2.pt",
+):
+    from imt.methods import RNNO, RNNO_rO
+
+    pairs = [(segments[i], segments[i + 1]) for i in range(len(segments) - 1)]
+
+    model = torch.load(model_path, map_location="cuda", weights_only=False)
+    model.eval()
+
+    rnno = RNNO()
+    rnno_ro = RNNO_rO()
+
+    with h5py.File(save, "w") as f:
+        f.attrs["Ts"] = Ts
+        f.attrs["warmup"] = warmup
+        f.attrs["segments"] = segments
+
+        for exp_id in range(1, N_EXPERIMENTS + 1):
+            n_motions = MOTIONS_PER_EXP[exp_id]
+            for motion in range(1, n_motions + 1):
+                data = load_data(
+                    exp_id,
+                    motion_start=motion,
+                    motion_stop=motion,
+                    resample_to_hz=1 / Ts,
+                )
+
+                for imu_key in ("imu_rigid", "imu_nonrigid"):
+                    imu_label = imu_key.removeprefix("imu_")
+                    key = f"exp{exp_id:02d}/motion{motion:02d}/{imu_label}"
+                    print(f"{key} ...", end=" ", flush=True)
+
+                    for seg_p, seg_i in pairs:
+                        acc_p = data[seg_p][imu_key]["acc"]
+                        gyr_p = data[seg_p][imu_key]["gyr"]
+                        acc_i = data[seg_i][imu_key]["acc"]
+                        gyr_i = data[seg_i][imu_key]["gyr"]
+                        pair_key = f"{key}/{seg_p}_{seg_i}"
+
+                        grp = f.create_group(pair_key)
+                        grp["q_parent"] = data[seg_p]["quat"]
+                        grp["q_child"] = data[seg_i]["quat"]
+                        grp["pred_ours"] = _run_pair(
+                            model, acc_p, gyr_p, acc_i, gyr_i, Ts
+                        )
+                        grp["qrel_rnno"] = _run_imt(
+                            rnno, acc_p, gyr_p, acc_i, gyr_i, Ts
+                        )
+                        grp["qrel_rnno_rO"] = _run_imt(
+                            rnno_ro, acc_p, gyr_p, acc_i, gyr_i, Ts
+                        )
+
+                    print("done")
+
+    print(f"Saved to {save}")
+
+
+if __name__ == "__main__":
+    fire.Fire(main)
