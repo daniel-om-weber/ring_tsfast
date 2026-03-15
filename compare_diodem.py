@@ -35,12 +35,12 @@ import numpy as np  # noqa: E402
 # Required for torch.load to unpickle the saved model
 from train_rnno import RNNOModel, FeatureConfig  # noqa: F401, E402
 
-# Feature layout matching train_rnno.py FeatureConfig(joint_axes_1d=True, dt=True)
-# Per-segment: acc[0:3], gyr[3:6], ja_1d[6:9], dt[9:10]  → F=10, total=20
-F_PER_SEG = 10
+# Feature layout matching train_rnno.py FeatureConfig(dt=True)
+# Per-segment: acc[0:3], gyr[3:6], dt[6:7]  → F=7, total=14
+F_PER_SEG = 7
 SL_ACC = slice(0, 3)
 SL_GYR = slice(3, 6)
-SL_DT = slice(9, 10)
+SL_DT = slice(6, 7)
 
 N_EXPERIMENTS = 5
 MOTIONS_PER_EXP = {1: 13, 2: 8, 3: 1, 4: 7, 5: 2}
@@ -76,24 +76,32 @@ def _run_imt(method, acc_p, gyr_p, acc_i, gyr_i, Ts):
     return qrel
 
 
+def _h5_overwrite(grp, name, data):
+    """Write a dataset, replacing it if it already exists."""
+    if name in grp:
+        del grp[name]
+    grp[name] = data
+
+
 def main(
     save: str = "results.h5",
     segments: list[str] = ["seg2", "seg3", "seg4", "seg5"],
     Ts: float = 0.01,
     warmup: float = 5,
     model_path: str = "rnno_final_v2.pt",
+    ours_only: bool = False,
 ):
-    from imt.methods import RNNO, RNNO_rO
-
     pairs = [(segments[i], segments[i + 1]) for i in range(len(segments) - 1)]
 
     model = torch.load(model_path, map_location="cuda", weights_only=False)
     model.eval()
 
-    rnno = RNNO()
-    rnno_ro = RNNO_rO()
+    if not ours_only:
+        from imt.methods import RNNO, RNNO_rO
+        rnno = RNNO()
+        rnno_ro = RNNO_rO()
 
-    with h5py.File(save, "w") as f:
+    with h5py.File(save, "a") as f:
         f.attrs["Ts"] = Ts
         f.attrs["warmup"] = warmup
         f.attrs["segments"] = segments
@@ -120,18 +128,19 @@ def main(
                         gyr_i = data[seg_i][imu_key]["gyr"]
                         pair_key = f"{key}/{seg_p}_{seg_i}"
 
-                        grp = f.create_group(pair_key)
-                        grp["q_parent"] = data[seg_p]["quat"]
-                        grp["q_child"] = data[seg_i]["quat"]
-                        grp["pred_ours"] = _run_pair(
+                        grp = f.require_group(pair_key)
+                        _h5_overwrite(grp, "q_parent", data[seg_p]["quat"])
+                        _h5_overwrite(grp, "q_child", data[seg_i]["quat"])
+                        _h5_overwrite(grp, "pred_ours", _run_pair(
                             model, acc_p, gyr_p, acc_i, gyr_i, Ts
-                        )
-                        grp["qrel_rnno"] = _run_imt(
-                            rnno, acc_p, gyr_p, acc_i, gyr_i, Ts
-                        )
-                        grp["qrel_rnno_rO"] = _run_imt(
-                            rnno_ro, acc_p, gyr_p, acc_i, gyr_i, Ts
-                        )
+                        ))
+                        if not ours_only:
+                            _h5_overwrite(grp, "qrel_rnno", _run_imt(
+                                rnno, acc_p, gyr_p, acc_i, gyr_i, Ts
+                            ))
+                            _h5_overwrite(grp, "qrel_rnno_rO", _run_imt(
+                                rnno_ro, acc_p, gyr_p, acc_i, gyr_i, Ts
+                            ))
 
                     print("done")
 

@@ -22,10 +22,10 @@ from tsfast.tsdata.readers import HDF5Attrs, HDF5Signals
 from tsfast.models.cudagraph import GraphedStatefulModel
 
 HDF5_DIR = "ring_data_h5"
-BS, EPISODES, LR, TBP = 256, 4800, 1e-3, 1000
+BS, EPISODES, LR, TBP = 256, 10000, 1e-3, 1000
 N_VAL, RNN_W, RNN_D, LIN_D = 256, 400, 2, 2
 CELLTYPE, LAYERNORM, SEED = "gru", True, 1
-DROP_JA_1D, DROP_JA_2D, DROP_DOF = 0.5, 1.0, 1.0
+DROP_JA_1D, DROP_JA_2D, DROP_DOF = 1.0, 1.0, 1.0
 BATCHES_PER_EPOCH = 100
 NUM_WORKERS = 2
 
