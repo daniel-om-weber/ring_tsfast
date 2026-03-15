@@ -20,16 +20,17 @@ def main(h5_path: str = "results.h5", out: str = "comparison.png"):
         entries = []
         for exp_name in sorted(f.keys()):
             for mot_name in sorted(f[exp_name].keys()):
-                for pair_name in sorted(f[exp_name][mot_name].keys()):
-                    grp = f[exp_name][mot_name][pair_name]
-                    entries.append((
-                        f"{exp_name}/{mot_name}/{pair_name}",
-                        np.array(grp["q_parent"]),
-                        np.array(grp["q_child"]),
-                        np.array(grp["pred_ours"]),
-                        np.array(grp["qrel_rnno"]),
-                        np.array(grp["qrel_rnno_rO"]),
-                    ))
+                for imu_name in sorted(f[exp_name][mot_name].keys()):
+                    for pair_name in sorted(f[exp_name][mot_name][imu_name].keys()):
+                        grp = f[exp_name][mot_name][imu_name][pair_name]
+                        entries.append((
+                            f"{exp_name}/{mot_name}/{imu_name}/{pair_name}",
+                            np.array(grp["q_parent"]),
+                            np.array(grp["q_child"]),
+                            np.array(grp["pred_ours"]),
+                            np.array(grp["qrel_rnno"]),
+                            np.array(grp["qrel_rnno_rO"]),
+                        ))
 
     n = len(entries)
     fig, axes = plt.subplots(n, 1, figsize=(14, 2.5 * n), sharex=False)
