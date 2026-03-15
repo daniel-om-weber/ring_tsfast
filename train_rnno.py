@@ -245,9 +245,11 @@ if __name__ == "__main__":
 
     sampler = RandomSampler(ds_train, replacement=True, num_samples=BATCHES_PER_EPOCH * BS)
     dl_train = DataLoader(ds_train, batch_size=BS, sampler=sampler, drop_last=True,
-                          num_workers=NUM_WORKERS)
+                          num_workers=NUM_WORKERS, persistent_workers=NUM_WORKERS > 0,
+                          pin_memory=True)
     dl_val = DataLoader(ds_val, batch_size=min(len(ds_val), BS),
-                        num_workers=NUM_WORKERS)
+                        num_workers=NUM_WORKERS, persistent_workers=NUM_WORKERS > 0,
+                        pin_memory=True)
     dls = DataLoaders(train=dl_train, valid=dl_val)
     n_epoch = EPISODES // BATCHES_PER_EPOCH
 
