@@ -8,3 +8,4 @@ pmap.py
 *.onnx
 ring_data
 ring_data_h5
+*.pt
