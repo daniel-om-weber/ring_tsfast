@@ -1,9 +1,9 @@
-"""Convert pickle dataset to per-file HDF5 with 1-D signal datasets (tsdata-compatible).
+"""Convert pickle dataset to per-file HDF5 with 2-D signal datasets (tsdata-compatible).
 
-Each pickle produces one HDF5 file with 40 1-D signals of length T=6000:
-  seg{2..5}_acc_{x,y,z}   (12 signals)
-  seg{2..5}_gyr_{x,y,z}   (12 signals)
-  seg{2..5}_q_{w,x,y,z}   (16 signals)
+Each pickle produces one HDF5 file with 12 datasets of length T=6000:
+  seg{2..5}_acc   (T, 3)
+  seg{2..5}_gyr   (T, 3)
+  seg{2..5}_q     (T, 4)
 
 Plus scalar/array attrs: dt, seg{3..5}_dof, seg{3..5}_ja_rr, seg{3..5}_ja_rsaddle.
 All datasets are contiguous (chunks=None, no compression) for mmap by HDF5Signals.
@@ -23,11 +23,6 @@ HDF5_DIR = "ring_data_h5"
 OLD_SEGMENTS = ["seg2_4Seg", "seg3_4Seg", "seg4_4Seg", "seg5_4Seg"]
 SEGS = ["seg2", "seg3", "seg4", "seg5"]
 
-ACC_COMP = ["acc_x", "acc_y", "acc_z"]
-GYR_COMP = ["gyr_x", "gyr_y", "gyr_z"]
-Q_COMP = ["q_w", "q_x", "q_y", "q_z"]
-
-
 def convert_one(pickle_path: str, h5_path: str):
     with open(pickle_path, "rb") as f:
         X, Y = pickle.load(f)
@@ -36,17 +31,9 @@ def convert_one(pickle_path: str, h5_path: str):
         f.attrs["dt"] = np.float32(X["dt"])
 
         for old_seg, seg in zip(OLD_SEGMENTS, SEGS):
-            acc = X[old_seg]["acc"].astype(np.float32)
-            for j, comp in enumerate(ACC_COMP):
-                f.create_dataset(f"{seg}_{comp}", data=acc[:, j], chunks=None)
-
-            gyr = X[old_seg]["gyr"].astype(np.float32)
-            for j, comp in enumerate(GYR_COMP):
-                f.create_dataset(f"{seg}_{comp}", data=gyr[:, j], chunks=None)
-
-            q = Y[old_seg].astype(np.float32)
-            for j, comp in enumerate(Q_COMP):
-                f.create_dataset(f"{seg}_{comp}", data=q[:, j], chunks=None)
+            f.create_dataset(f"{seg}_acc", data=X[old_seg]["acc"].astype(np.float32), chunks=None)
+            f.create_dataset(f"{seg}_gyr", data=X[old_seg]["gyr"].astype(np.float32), chunks=None)
+            f.create_dataset(f"{seg}_q", data=Y[old_seg].astype(np.float32), chunks=None)
 
             if seg != "seg2":
                 dof = int(X[old_seg]["dof"])
@@ -70,15 +57,9 @@ def verify_sample(pickle_path: str, h5_path: str):
     with h5py.File(h5_path, "r") as f:
         assert np.isclose(f.attrs["dt"], X_pkl["dt"], atol=1e-7)
         for old_seg, seg in zip(OLD_SEGMENTS, SEGS):
-            acc = X_pkl[old_seg]["acc"].astype(np.float32)
-            gyr = X_pkl[old_seg]["gyr"].astype(np.float32)
-            q = Y_pkl[old_seg].astype(np.float32)
-            for j, comp in enumerate(ACC_COMP):
-                np.testing.assert_allclose(f[f"{seg}_{comp}"][()], acc[:, j], atol=1e-7)
-            for j, comp in enumerate(GYR_COMP):
-                np.testing.assert_allclose(f[f"{seg}_{comp}"][()], gyr[:, j], atol=1e-7)
-            for j, comp in enumerate(Q_COMP):
-                np.testing.assert_allclose(f[f"{seg}_{comp}"][()], q[:, j], atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_acc"][()], X_pkl[old_seg]["acc"].astype(np.float32), atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_gyr"][()], X_pkl[old_seg]["gyr"].astype(np.float32), atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_q"][()], Y_pkl[old_seg].astype(np.float32), atol=1e-7)
             if seg != "seg2":
                 assert int(f.attrs[f"{seg}_dof"]) == int(X_pkl[old_seg]["dof"])
 

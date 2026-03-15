@@ -85,15 +85,9 @@ def make_pair_dataset(files, pair_idx):
     """Create a WindowedDataset for one segment pair."""
     s0, s1 = PAIRS[pair_idx]
     imu = HDF5Signals([
-        f'{s0}_acc_x', f'{s0}_acc_y', f'{s0}_acc_z',
-        f'{s0}_gyr_x', f'{s0}_gyr_y', f'{s0}_gyr_z',
-        f'{s1}_acc_x', f'{s1}_acc_y', f'{s1}_acc_z',
-        f'{s1}_gyr_x', f'{s1}_gyr_y', f'{s1}_gyr_z',
+        f'{s0}_acc', f'{s0}_gyr', f'{s1}_acc', f'{s1}_gyr',
     ], use_mmap=False)
-    quat = HDF5Signals([
-        f'{s0}_q_w', f'{s0}_q_x', f'{s0}_q_y', f'{s0}_q_z',
-        f'{s1}_q_w', f'{s1}_q_x', f'{s1}_q_y', f'{s1}_q_z',
-    ], use_mmap=False)
+    quat = HDF5Signals([f'{s0}_q', f'{s1}_q'], use_mmap=False)
     attrs = HDF5Attrs(['dt', f'{s1}_dof', f'{s1}_ja_rr'])
     entries = [FileEntry(path=f) for f in files]
     return WindowedDataset(entries, inputs=(imu, attrs), targets=quat, win_sz=None)
