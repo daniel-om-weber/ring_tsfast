@@ -27,7 +27,7 @@ def _patched_init(self, path_or_bytes, sess_options=None, providers=None, provid
 
 ort.InferenceSession.__init__ = _patched_init
 
-from diodem import load_data  # noqa: E402
+from diodem import load_data, load_all_valid_motions_in_trial  # noqa: E402
 import fire  # noqa: E402
 import h5py  # noqa: E402
 import numpy as np  # noqa: E402
@@ -42,8 +42,17 @@ SL_ACC = slice(0, 3)
 SL_GYR = slice(3, 6)
 SL_DT = slice(6, 7)
 
-N_EXPERIMENTS = 5
-MOTIONS_PER_EXP = {1: 13, 2: 8, 3: 1, 4: 7, 5: 2}
+N_EXPERIMENTS = 11
+BACKEND = "dataverse"
+
+# ARM (exp01-05): seg1→seg2→seg3→seg4→seg5
+# GAIT (exp06-11): seg5→seg1→seg2→seg3→seg4
+ARM_SEGMENTS = ["seg1", "seg2", "seg3", "seg4", "seg5"]
+GAIT_SEGMENTS = ["seg5", "seg1", "seg2", "seg3", "seg4"]
+
+
+def _segments_for_exp(exp_id):
+    return ARM_SEGMENTS if exp_id <= 5 else GAIT_SEGMENTS
 
 
 def _run_pair(model, acc_p, gyr_p, acc_i, gyr_i, Ts):
@@ -85,13 +94,17 @@ def _h5_overwrite(grp, name, data):
 
 def main(
     save: str = "results.h5",
-    segments: list[str] = ["seg2", "seg3", "seg4", "seg5"],
     Ts: float = 0.01,
     warmup: float = 5,
-    model_path: str = "rnno_final_v2.pt",
+    model_path: str = "rnno_v3.pt",
+    name: str | None = None,
     ours_only: bool = False,
 ):
-    pairs = [(segments[i], segments[i + 1]) for i in range(len(segments) - 1)]
+    # Derive dataset key from model filename if not provided
+    if name is None:
+        name = os.path.splitext(os.path.basename(model_path))[0]
+    pred_key = f"pred_{name}"
+    print(f"Model predictions will be stored as '{pred_key}'")
 
     model = torch.load(model_path, map_location="cuda", weights_only=False)
     model.eval()
@@ -104,16 +117,19 @@ def main(
     with h5py.File(save, "a") as f:
         f.attrs["Ts"] = Ts
         f.attrs["warmup"] = warmup
-        f.attrs["segments"] = segments
 
         for exp_id in range(1, N_EXPERIMENTS + 1):
-            n_motions = MOTIONS_PER_EXP[exp_id]
+            segments = _segments_for_exp(exp_id)
+            pairs = [(segments[i], segments[i + 1]) for i in range(len(segments) - 1)]
+            n_motions = len(load_all_valid_motions_in_trial(exp_id, backend=BACKEND))
+
             for motion in range(1, n_motions + 1):
                 data = load_data(
                     exp_id,
                     motion_start=motion,
                     motion_stop=motion,
                     resample_to_hz=1 / Ts,
+                    backend=BACKEND,
                 )
 
                 for imu_key in ("imu_rigid", "imu_nonrigid"):
@@ -131,7 +147,7 @@ def main(
                         grp = f.require_group(pair_key)
                         _h5_overwrite(grp, "q_parent", data[seg_p]["quat"])
                         _h5_overwrite(grp, "q_child", data[seg_i]["quat"])
-                        _h5_overwrite(grp, "pred_ours", _run_pair(
+                        _h5_overwrite(grp, pred_key, _run_pair(
                             model, acc_p, gyr_p, acc_i, gyr_i, Ts
                         ))
                         if not ours_only:
