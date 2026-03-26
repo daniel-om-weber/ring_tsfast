@@ -35,12 +35,8 @@ import numpy as np  # noqa: E402
 # Required for torch.load to unpickle the saved model
 from train_rnno import RNNOModel, FeatureConfig  # noqa: F401, E402
 
-# Feature layout matching train_rnno.py FeatureConfig(dt=True)
-# Per-segment: acc[0:3], gyr[3:6], dt[6:7]  → F=7, total=14
-F_PER_SEG = 7
 SL_ACC = slice(0, 3)
 SL_GYR = slice(3, 6)
-SL_DT = slice(6, 7)
 
 N_EXPERIMENTS = 11
 BACKEND = "dataverse"
@@ -55,17 +51,25 @@ def _segments_for_exp(exp_id):
     return ARM_SEGMENTS if exp_id <= 5 else GAIT_SEGMENTS
 
 
-def _run_pair(model, acc_p, gyr_p, acc_i, gyr_i, Ts):
+def _detect_f_per_seg(model):
+    """Detect features-per-segment from the model's first RNN weight."""
+    w = next(iter(model.model.rnn.parameters()))
+    return w.shape[1] // 2
+
+
+def _run_pair(model, acc_p, gyr_p, acc_i, gyr_i, Ts, f_per_seg):
     """Run our model on a single segment pair, return full (T, 8) output."""
     T_len = acc_p.shape[0]
-    X = np.zeros((1, T_len, 2 * F_PER_SEG), dtype=np.float32)
+    X = np.zeros((1, T_len, 2 * f_per_seg), dtype=np.float32)
     X[0, :, SL_ACC] = acc_p
     X[0, :, SL_GYR] = gyr_p
-    X[0, :, SL_DT] = Ts
-    off = F_PER_SEG
+    if f_per_seg > 6:
+        X[0, :, 6:7] = Ts
+    off = f_per_seg
     X[0, :, off + SL_ACC.start : off + SL_ACC.stop] = acc_i
     X[0, :, off + SL_GYR.start : off + SL_GYR.stop] = gyr_i
-    X[0, :, off + SL_DT.start : off + SL_DT.stop] = Ts
+    if f_per_seg > 6:
+        X[0, :, off + 6 : off + 7] = Ts
 
     x = torch.from_numpy(X).cuda()
     with torch.no_grad():
@@ -108,6 +112,8 @@ def main(
 
     model = torch.load(model_path, map_location="cuda", weights_only=False)
     model.eval()
+    f_per_seg = _detect_f_per_seg(model)
+    print(f"Detected {f_per_seg} features per segment (total input: {2 * f_per_seg})")
 
     if not ours_only:
         from imt.methods import RNNO, RNNO_rO
@@ -148,7 +154,7 @@ def main(
                         _h5_overwrite(grp, "q_parent", data[seg_p]["quat"])
                         _h5_overwrite(grp, "q_child", data[seg_i]["quat"])
                         _h5_overwrite(grp, pred_key, _run_pair(
-                            model, acc_p, gyr_p, acc_i, gyr_i, Ts
+                            model, acc_p, gyr_p, acc_i, gyr_i, Ts, f_per_seg
                         ))
                         if not ours_only:
                             _h5_overwrite(grp, "qrel_rnno", _run_imt(

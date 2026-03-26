@@ -20,9 +20,11 @@ from tsfast.tsdata.dataset import FileEntry, WindowedDataset
 from tsfast.tsdata.pipeline import DataLoaders
 from tsfast.tsdata.readers import HDF5Attrs, HDF5Signals
 from tsfast.models.cudagraph import GraphedStatefulModel
+import pytorch_optimizer
+from functools import partial
 
-HDF5_DIR = "ring_data_h5"
-BS, EPISODES, LR, TBP = 256, 10000, 1e-3, 1000
+HDF5_DIR = "ring_data_diverse_h5"
+BS, EPISODES, LR, TBP = 256, 10000, 1e-3, 150
 N_VAL, RNN_W, RNN_D, LIN_D = 256, 400, 2, 2
 CELLTYPE, LAYERNORM, SEED = "gru", True, 1
 DROP_JA_1D, DROP_JA_2D, DROP_DOF = 1.0, 1.0, 1.0
@@ -38,8 +40,8 @@ torch.manual_seed(SEED)
 class FeatureConfig:
     joint_axes_1d: bool = False
     joint_axes_2d: bool = False
-    dof: bool = True
-    dt: bool = True
+    dof: bool = False
+    dt: bool = False
 
     SCALE_ACC: float = 9.81
     SCALE_GYR: float = 2.2
@@ -235,7 +237,7 @@ class AGCLearner(TbpttLearner):
 # %% Build + Train + Save
 if __name__ == "__main__":
     lam, n_segments = (-1, 0), 2
-    imtp = FeatureConfig(joint_axes_1d=DROP_JA_1D != 1, joint_axes_2d=DROP_JA_2D != 1, dof=DROP_DOF != 1)
+    imtp = FeatureConfig(joint_axes_1d=DROP_JA_1D != 1, joint_axes_2d=DROP_JA_2D != 1, dof=DROP_DOF != 1, dt=True)
 
     files = sorted(str(p) for p in Path(HDF5_DIR).glob('*.h5'))
     np.random.shuffle(files)
@@ -267,11 +269,15 @@ if __name__ == "__main__":
 
     learner = AGCLearner(
         model=model_graphed, dls=dls, loss_func=rnno_loss_factory(lam, n_segments),
-        opt_func=lambda params, lr: torch_optimizer.Lamb(params, lr=lr, weight_decay=0.0),
+        # opt_func=lambda params, lr: torch_optimizer.Lamb(params, lr=lr, weight_decay=0.0), 
+        opt_func=partial(pytorch_optimizer.Ranger, betas=(0.95, 0.99), eps=1e-6, weight_decay=0.01, use_gc=False),
+    
         transforms=[], metrics=metrics, grad_clip=None, sub_seq_len=TBP,
         imtp=imtp, drop_ja_1d=DROP_JA_1D)
 
     learner.fit(n_epoch=n_epoch, lr=LR,
                 scheduler_fn=cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7))
+    # learner.fit_flat_cos(n_epoch=n_epoch,lr=LR,pct_start=0.3)
 
-    torch.save(model, "rnno_final_v2.pt")
+    torch.save(model, "rnno_v5_diverse_dt.pt")
+    # learner.save("rnno_learner_v3.pth")

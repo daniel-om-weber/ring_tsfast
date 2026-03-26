@@ -13,27 +13,26 @@ import pickle
 import random
 from pathlib import Path
 
+import fire
 import h5py
 import numpy as np
 from tqdm import tqdm
 
-PICKLE_DIR = "ring_data"
-HDF5_DIR = "ring_data_h5"
-
 OLD_SEGMENTS = ["seg2_4Seg", "seg3_4Seg", "seg4_4Seg", "seg5_4Seg"]
 SEGS = ["seg2", "seg3", "seg4", "seg5"]
 
-def convert_one(pickle_path: str, h5_path: str):
+def convert_one(pickle_path: str, h5_path: str, max_samples: int | None = None):
     with open(pickle_path, "rb") as f:
         X, Y = pickle.load(f)
 
+    T = slice(None, max_samples)
     with h5py.File(h5_path, "w") as f:
         f.attrs["dt"] = np.float32(X["dt"])
 
         for old_seg, seg in zip(OLD_SEGMENTS, SEGS):
-            f.create_dataset(f"{seg}_acc", data=X[old_seg]["acc"].astype(np.float32), chunks=None)
-            f.create_dataset(f"{seg}_gyr", data=X[old_seg]["gyr"].astype(np.float32), chunks=None)
-            f.create_dataset(f"{seg}_q", data=Y[old_seg].astype(np.float32), chunks=None)
+            f.create_dataset(f"{seg}_acc", data=X[old_seg]["acc"][T].astype(np.float32), chunks=None)
+            f.create_dataset(f"{seg}_gyr", data=X[old_seg]["gyr"][T].astype(np.float32), chunks=None)
+            f.create_dataset(f"{seg}_q", data=Y[old_seg][T].astype(np.float32), chunks=None)
 
             if seg != "seg2":
                 dof = int(X[old_seg]["dof"])
@@ -55,28 +54,29 @@ def verify_sample(pickle_path: str, h5_path: str):
         X_pkl, Y_pkl = pickle.load(f)
 
     with h5py.File(h5_path, "r") as f:
+        T = f[f"{SEGS[0]}_acc"].shape[0]
         assert np.isclose(f.attrs["dt"], X_pkl["dt"], atol=1e-7)
         for old_seg, seg in zip(OLD_SEGMENTS, SEGS):
-            np.testing.assert_allclose(f[f"{seg}_acc"][()], X_pkl[old_seg]["acc"].astype(np.float32), atol=1e-7)
-            np.testing.assert_allclose(f[f"{seg}_gyr"][()], X_pkl[old_seg]["gyr"].astype(np.float32), atol=1e-7)
-            np.testing.assert_allclose(f[f"{seg}_q"][()], Y_pkl[old_seg].astype(np.float32), atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_acc"][()], X_pkl[old_seg]["acc"][:T].astype(np.float32), atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_gyr"][()], X_pkl[old_seg]["gyr"][:T].astype(np.float32), atol=1e-7)
+            np.testing.assert_allclose(f[f"{seg}_q"][()], Y_pkl[old_seg][:T].astype(np.float32), atol=1e-7)
             if seg != "seg2":
                 assert int(f.attrs[f"{seg}_dof"]) == int(X_pkl[old_seg]["dof"])
 
 
-def main():
-    pickle_dir = Path(PICKLE_DIR)
-    h5_dir = Path(HDF5_DIR)
+def main(pickle_dir: str = "ring_data", h5_dir: str = "ring_data_h5", max_samples: int | None = None):
+    pickle_dir = Path(pickle_dir)
+    h5_dir = Path(h5_dir)
     h5_dir.mkdir(exist_ok=True)
 
     pickle_files = sorted(str(p) for p in pickle_dir.iterdir() if p.suffix == ".pickle")
     print(f"Found {len(pickle_files)} pickle files")
-    print(f"Output directory: {HDF5_DIR}")
+    print(f"Output directory: {h5_dir}")
 
     for pkl_path in tqdm(pickle_files, desc="Converting"):
         name = Path(pkl_path).stem
         h5_path = str(h5_dir / f"{name}.h5")
-        convert_one(pkl_path, h5_path)
+        convert_one(pkl_path, h5_path, max_samples)
 
     n_verify = min(10, len(pickle_files))
     verify_indices = random.sample(range(len(pickle_files)), n_verify)
@@ -89,4 +89,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)

@@ -168,15 +168,53 @@ def _add_rom(mconfig: ring.MotionConfig) -> ring.MotionConfig:
         dang_max_free_spherical=0.8,
         t_max=5.0,
     )
-    return replace(
-        mconfig, joint_type_specific_overwrites=dict(cor=overwrites, free=overwrites)
-    )
+    existing = dict(mconfig.joint_type_specific_overwrites or {})
+    for jt in ("cor", "free"):
+        # existing constraints (e.g. from -S variants) take precedence
+        existing[jt] = {**overwrites, **existing.get(jt, {})}
+    return replace(mconfig, joint_type_specific_overwrites=existing)
+
+
+def _build_diverse_configs(T: float) -> list[ring.MotionConfig]:
+    """Build 12 MotionConfigs covering the full motion diversity needed for DIODEM."""
+    # Group 1+2: registered configs
+    registered = [
+        "standard", "expFast", "expSlow", "hinUndHer",  # existing baseline
+        "verySlow", "langsam",                           # fill velocity gaps
+        "expSlow-S", "standard-S",                       # gait-like trunk constraints
+    ]
+    configs = [replace(ring.MotionConfig.from_register(c), T=T) for c in registered]
+
+    # Custom: verySlow with maximally constrained trunk (ultra-slow gait)
+    configs.append(replace(ring.MotionConfig.from_register("verySlow"), T=T,
+        joint_type_specific_overwrites=dict(
+            free=dict(dang_max_free_spherical=0.1, dpos_max=0.05,
+                      cor_dpos_max=0.05, t_min=1.5, t_max=15.0),
+            cor=dict(dang_max_free_spherical=0.1, dpos_max=0.05,
+                     cor_dpos_max=0.05, t_min=1.5, t_max=15.0),
+        )))
+
+    # Custom: cyclic-fast — tight ROM oscillation at high speed
+    configs.append(replace(ring.MotionConfig.from_register("expFast"), T=T,
+        rom_halfsize=0.5, delta_ang_min=np.deg2rad(30), delta_ang_max=np.deg2rad(55)))
+
+    # Custom: cyclic-slow — tight ROM oscillation at low speed
+    configs.append(replace(ring.MotionConfig.from_register("expSlow"), T=T,
+        rom_halfsize=0.35))
+
+    # Custom: slow with burst-pause pattern (standstills)
+    configs.append(replace(ring.MotionConfig.from_register("verySlow"), T=T,
+        include_standstills_prob=0.15,
+        include_standstills_t_min=0.5, include_standstills_t_max=3.0))
+
+    return configs
 
 
 def main(
     size: int,  # 32 * n_mconfigs * n_gens (= n_anchors * 3**(N-1)) * X
     output_path: str,
     configs: list[str] = ["standard", "expSlow", "expFast", "hinUndHer"],
+    config_preset: Optional[str] = None,
     seed: int = 1,
     anchors: Optional[list[str]] = None,
     mot_art: bool = False,
@@ -235,15 +273,21 @@ def main(
     if mot_art:
         dyn_sim = True
 
-    configs = [replace(ring.MotionConfig.from_register(c), T=T) for c in configs]
-    if embc_rom_limitation:
-        _replace_rom = lambda mconfig, add: _add_rom(mconfig) if add else mconfig
-        configs = [_replace_rom(c, add) for c in configs for add in [False, True]]
-    if include_standstills_prob > 0.0:
-        configs = [
-            replace(c, include_standstills_prob=include_standstills_prob)
-            for c in configs
-        ]
+    if config_preset is not None:
+        if config_preset == "diverse":
+            configs = _build_diverse_configs(T)
+        else:
+            raise ValueError(f"Unknown config_preset: {config_preset}")
+    else:
+        configs = [replace(ring.MotionConfig.from_register(c), T=T) for c in configs]
+        if embc_rom_limitation:
+            _replace_rom = lambda mconfig, add: _add_rom(mconfig) if add else mconfig
+            configs = [_replace_rom(c, add) for c in configs for add in [False, True]]
+        if include_standstills_prob > 0.0:
+            configs = [
+                replace(c, include_standstills_prob=include_standstills_prob)
+                for c in configs
+            ]
 
     rcmg = ring.RCMG(
         syss,

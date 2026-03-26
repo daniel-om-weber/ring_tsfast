@@ -8,6 +8,7 @@ dependencies = [
     "qmt",
     "tsfast",
     "torch-optimizer",
+    "pytorch-optimizer>=3.10.0",
 ]
 
 [project.optional-dependencies]
