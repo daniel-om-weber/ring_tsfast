@@ -14,13 +14,15 @@ dependencies = [
 [project.optional-dependencies]
 jax = ["imt-ring", "fire", "wandb"]
 imt = ["imt-imt", "imt-diodem", "onnxruntime-gpu", "tensorrt-cu12"]
+dfjimu = ["dfjimu", "scipy"]
 
 [tool.uv]
 exclude-dependencies = ["onnxruntime"]
 
 [tool.uv.sources]
-tsfast = { path = "../tsfast", editable = true }
+tsfast = { git = "https://github.com/daniel-om-weber/tsfast.git" }
 imt-imt = { git = "https://github.com/simon-bachhuber/imt.git" }
+dfjimu = { git = "https://github.com/daniel-om-weber/dfjimu.git" }
 
 [tool.setuptools]
 py-modules = []

@@ -1,36 +1,49 @@
-# Dependencies
-1) `pip install -U "jax[cuda12]"`
+# ring_tsfast
 
-2) `pip install imt-ring imt-diodem fire`
+PyTorch re-implementation of [RNNO](https://github.com/simon-bachhuber/ring) training using [tsfast](https://github.com/daniel-om-weber/tsfast).
 
-3) `pip install git+https://github.com/simon-bachhuber/imt_benchmark`
+## Setup
 
-4) `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+Requires [uv](https://docs.astral.sh/uv/) and a local clone of `tsfast` as a sibling directory.
 
-### Bug: `scipy.sparse` throws `CircularImportError`
+```bash
+uv sync
+```
 
-1) `pip uninstall scipy` 
+For comparison runs using the original JAX-based `imt-ring`:
 
-2) `conda install scipy`
+```bash
+uv sync --extra jax
+```
 
-# Retraining of `RING` -- Newer Version
+## Scripts
 
-1) `python train_step1_generateData_v2.py 65536 ring_data --mot-art --dof-configuration "['111']"`
+| Script | Description |
+|--------|-------------|
+| `train_rnno.py` | Simplified RNNO training using `tsfast` (PyTorch) |
+| `train_step2_trainRing_v2_rnno_tsfast.py` | Full-featured RNNO training using `tsfast` |
+| `train_step1_generateData_v2.py` | Dataset generation (requires `imt-ring`) |
+| `train_step2_trainRing_v2.py` | Original RING training (JAX, for comparison) |
+| `train_step2_trainRing_v2_rnno.py` | Original RNNO training (JAX, for comparison) |
 
-2) `python train_step2_trainRing_v2.py ring_data 512 4800 --drop-dof 1.0 --lin-d 2 --layernorm --four-seg --drop-ja-2d 1.0`
+## Usage
 
-# Retraining of `RING` -- Older Version
+### Training RNNO (tsfast)
 
-After the installation steps, you can use the two files `train_*.py` to
-1) Create training data using `train_step1_generateData.py`. Use `python train_step1_generateData.py --help` for documentation.
-    Example: `python train_step1_generateData.py train_xmls/lam1.xml 16`
+Set `PATH_LAM4` in `train_rnno.py` to your dataset folder, then:
 
-    For retraining of RING run:
-    - file1 (39Gb): `python train_step1_generateData.py train_xmls/lam1.xml 131072 "[standard, expSlow, expFast, hinUndHer]" --seed 1 --sampling-rates "[40, 60, 80, 100, 120, 140, 160, 180, 200]"`
-    - file2 (77Gb): `python train_step1_generateData.py train_xmls/lam2.xml 131072 "[standard, expSlow, expFast, hinUndHer]" --anchors "[seg3_2Seg, seg4_2Seg]" --imu-motion-artifacts --seed 2 --sampling-rates "[40, 60, 80, 100, 120, 140, 160, 180, 200]"`
-    - file3 (115Gb): `python train_step1_generateData.py train_xmls/lam3.xml 131072 "[standard, expSlow, expFast, hinUndHer]" --anchors "[seg3_3Seg, seg5_3Seg]" --imu-motion-artifacts --seed 3 --sampling-rates "[40, 60, 80, 100, 120, 140, 160, 180, 200]"`
-    - file4 (153Gb): `python train_step1_generateData.py train_xmls/lam4.xml 131072 "[standard, expSlow, expFast, hinUndHer]" --anchors "[seg2_4Seg, seg3_4Seg, seg4_4Seg, seg5_4Seg]" --imu-motion-artifacts --seed 4 --sampling-rates "[40, 60, 80, 100, 120, 140, 160, 180, 200]"`
+```bash
+python train_rnno.py
+```
 
-2) (Re)Train RING using `train_step2_trainRing.py`. Use `python train_step2_trainRing.py --help` for documentation.
+### Generating training data (requires `--extra jax`)
 
-    For retraining of RING: `python train_step2_trainRing.py path_file1 path_file2 path_file3 path_file4 512 4800 ~/params/trained_ring_params.pickle`
+```bash
+python train_step1_generateData_v2.py 65536 ring_data --mot-art --dof-configuration "['111']"
+```
+
+### Training RING (JAX, requires `--extra jax`)
+
+```bash
+python train_step2_trainRing_v2.py ring_data 512 4800 --drop-dof 1.0 --lin-d 2 --layernorm --four-seg --drop-ja-2d 1.0
+```
