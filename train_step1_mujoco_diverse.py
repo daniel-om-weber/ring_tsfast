@@ -36,7 +36,8 @@ from mogen.trajectory import generate_q_ref
 
 SEGMENTS = ["seg2", "seg3", "seg4", "seg5"]
 IMUS = ["imu2", "imu3", "imu4", "imu5"]
-DEFAULT_SAMPLING_RATES = [40, 60, 80, 100, 120, 140, 160, 180, 200]
+DEFAULT_SAMPLING_RATES = [100]
+WARMUP_STEPS = 100  # 1 second at 100 Hz; trimmed from output so acc[0] reads gravity
 # Segment geometry (half-sizes for MuJoCo box geoms)
 SEG_HALF_SIZE = "0.1 0.025 0.025"
 SEG_MASS = 1.0
@@ -80,6 +81,8 @@ CONFIG_NAMES_DIVERSE = [
     "verySlow-S+",                                   # ultra-slow gait
     "cyclic-fast", "cyclic-slow",                    # periodic
     "slow-standstills",                              # burst-pause
+    "fast-explosive",                                # high angular velocity
+    "rom-small", "rom-medium", "rom-large",          # restricted range of motion
 ]
 
 
@@ -147,12 +150,14 @@ def _make_motion_presets():
             "hinge": mogen.HingeMotion(
                 vel_range=(0.1, 3.0), keyframe_interval=(0.05, 0.30),
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 5),
             "free": mogen.FreeMotion(
                 ang_vel_range=(0.1, 3.0), keyframe_interval=(0.05, 0.30),
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.5, 1, 5),
         },
@@ -161,6 +166,7 @@ def _make_motion_presets():
                 vel_range=(0.1, 1.0), keyframe_interval=(0.75, 3.0),
                 delta_ang_min=0.4, range_of_motion_method="sigmoid",
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 5),
             "free": mogen.FreeMotion(
@@ -168,6 +174,7 @@ def _make_motion_presets():
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 delta_ang_min=0.4, randomized_interpolation=True,
                 cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.3, 1, 5),
         },
@@ -177,6 +184,7 @@ def _make_motion_presets():
                 delta_ang_min=PI / 3, delta_ang_max=11 * PI / 18,
                 range_of_motion_method="sigmoid",
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 3),
             "free": mogen.FreeMotion(
@@ -184,6 +192,7 @@ def _make_motion_presets():
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 delta_ang_min=PI / 3, delta_ang_max=11 * PI / 18,
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.5, 1, 3),
         },
@@ -191,14 +200,16 @@ def _make_motion_presets():
             "hinge": mogen.HingeMotion(
                 vel_range=(0.1, 3.0), keyframe_interval=(0.3, 1.5),
                 delta_ang_min=0.5, randomized_interpolation=True, cdf_bins_min=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
-            "residual_hinge": _res(5),
+            "residual_hinge": _res(5, 5),
             "free": mogen.FreeMotion(
                 ang_vel_range=(0.1, 3.0), keyframe_interval=(0.3, 1.5),
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 delta_ang_min=0.5, randomized_interpolation=True, cdf_bins_min=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
-            "cor_slide": _cor(0.5, 5),
+            "cor_slide": _cor(0.5, 5, 5),
         },
 
         # ── Group 2: fill velocity gaps ──
@@ -222,12 +233,14 @@ def _make_motion_presets():
             "hinge": mogen.HingeMotion(
                 vel_range=(0.1, 2.0), keyframe_interval=(0.2, 1.25),
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 3),
             "free": mogen.FreeMotion(
                 ang_vel_range=(0.1, 2.0), keyframe_interval=(0.2, 1.25),
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.5, 1, 3),
         },
@@ -238,6 +251,7 @@ def _make_motion_presets():
                 vel_range=(0.1, 1.0), keyframe_interval=(0.75, 3.0),
                 delta_ang_min=0.4, range_of_motion_method="sigmoid",
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 5),
             "free": mogen.FreeMotion(
@@ -251,6 +265,7 @@ def _make_motion_presets():
             "hinge": mogen.HingeMotion(
                 vel_range=(0.1, 3.0), keyframe_interval=(0.05, 0.30),
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 5),
             "free": mogen.FreeMotion(
@@ -286,6 +301,7 @@ def _make_motion_presets():
                 delta_ang_min=PI / 6, delta_ang_max=55 * PI / 180,
                 rom_halfsize=0.5, range_of_motion_method="sigmoid",
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 3),
             "free": mogen.FreeMotion(
@@ -293,6 +309,7 @@ def _make_motion_presets():
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 delta_ang_min=PI / 6, delta_ang_max=55 * PI / 180,
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.5, 1, 3),
         },
@@ -303,6 +320,7 @@ def _make_motion_presets():
                 delta_ang_min=0.4, rom_halfsize=0.35,
                 range_of_motion_method="sigmoid",
                 randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "residual_hinge": _res(1, 5),
             "free": mogen.FreeMotion(
@@ -310,6 +328,7 @@ def _make_motion_presets():
                 translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
                 delta_ang_min=0.4, randomized_interpolation=True,
                 cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
             ),
             "cor_slide": _cor(0.3, 1, 5),
         },
@@ -333,6 +352,77 @@ def _make_motion_presets():
             ),
             "cor_slide": _cor(0.3, 1, 3),
         },
+        # Fast explosive: high angular velocity, low damping regime
+        "fast-explosive": {
+            "hinge": mogen.HingeMotion(
+                vel_range=(1.0, 2 * PI), keyframe_interval=(0.2, 0.8),
+                delta_ang_min=PI / 2, delta_ang_max=PI,
+                range_of_motion_method="sigmoid",
+                randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+            ),
+            "residual_hinge": _res(1, 3),
+            "free": mogen.FreeMotion(
+                ang_vel_range=(0.5, PI), keyframe_interval=(0.2, 0.8),
+                translation="track", lin_vel_range=(0.01, 0.2), pos_range=(-0.5, 0.5),
+                delta_ang_min=PI / 3, delta_ang_max=PI,
+                randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+            ),
+            "cor_slide": _cor(0.5, 1, 3),
+        },
+        # Restricted ROM: small (~17-34° total range)
+        "rom-small": {
+            "hinge": mogen.HingeMotion(
+                vel_range=(0.1, 2.0), keyframe_interval=(0.2, 1.0),
+                delta_ang_max=0.3, rom_halfsize=0.3, range_of_motion_method="sigmoid",
+                randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "residual_hinge": _res(1, 5),
+            "free": mogen.FreeMotion(
+                ang_vel_range=(0.1, 1.0), keyframe_interval=(0.3, 1.5),
+                translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
+                randomized_interpolation=True,
+                cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "cor_slide": _cor(0.3, 1, 5),
+        },
+        # Restricted ROM: medium (~57-86° total range)
+        "rom-medium": {
+            "hinge": mogen.HingeMotion(
+                vel_range=(0.1, 3.0), keyframe_interval=(0.1, 0.8),
+                delta_ang_max=0.75, rom_halfsize=0.75, range_of_motion_method="sigmoid",
+                randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "residual_hinge": _res(1, 5),
+            "free": mogen.FreeMotion(
+                ang_vel_range=(0.1, 2.0), keyframe_interval=(0.2, 1.0),
+                translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
+                randomized_interpolation=True,
+                cdf_bins_min=1, cdf_bins_max=5,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "cor_slide": _cor(0.3, 1, 5),
+        },
+        # Restricted ROM: large (~114-143° total range)
+        "rom-large": {
+            "hinge": mogen.HingeMotion(
+                vel_range=(0.1, 3.0), keyframe_interval=(0.05, 0.5),
+                delta_ang_max=1.25, rom_halfsize=1.25, range_of_motion_method="sigmoid",
+                randomized_interpolation=True, cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "residual_hinge": _res(1, 3),
+            "free": mogen.FreeMotion(
+                ang_vel_range=(0.1, 3.0), keyframe_interval=(0.1, 0.8),
+                translation="track", lin_vel_range=(0.01, 0.1), pos_range=(-0.5, 0.5),
+                randomized_interpolation=True,
+                cdf_bins_min=1, cdf_bins_max=3,
+                standstill_prob=0.1, standstill_duration=(0.5, 3.0),
+            ),
+            "cor_slide": _cor(0.5, 1, 3),
+        },
     }
 
 
@@ -353,6 +443,20 @@ def _build_motion_dict(preset, model):
                 cdf_bins_min=free_cfg.cdf_bins_min,
                 cdf_bins_max=free_cfg.cdf_bins_max,
             )
+        elif typ == "ball":
+            # Inter-segment ball joint (3-DOF): derive BallMotion from hinge preset
+            hinge_cfg = preset["hinge"]
+            motion[name] = mogen.BallMotion(
+                ang_vel_range=hinge_cfg.vel_range,
+                keyframe_interval=hinge_cfg.keyframe_interval,
+                delta_ang_min=hinge_cfg.delta_ang_min,
+                delta_ang_max=hinge_cfg.delta_ang_max,
+                randomized_interpolation=hinge_cfg.randomized_interpolation,
+                cdf_bins_min=hinge_cfg.cdf_bins_min,
+                cdf_bins_max=hinge_cfg.cdf_bins_max,
+                standstill_prob=hinge_cfg.standstill_prob,
+                standstill_duration=hinge_cfg.standstill_duration,
+            )
         elif typ == "slide" and name.startswith("root_"):
             motion[name] = mogen.HingeMotion(
                 vel_range=free_cfg.lin_vel_range,
@@ -366,10 +470,7 @@ def _build_motion_dict(preset, model):
         elif typ == "slide" and name.startswith("cor_"):
             motion[name] = preset["cor_slide"]
         elif typ == "hinge":
-            if name.endswith("_res"):
-                motion[name] = preset["residual_hinge"]
-            else:
-                motion[name] = preset["hinge"]
+            motion[name] = preset["hinge"]
     return motion
 
 
@@ -395,7 +496,7 @@ def _imu_joint_xml(imu, indent, rot_stiffness, rot_damping, pos_stiffness, pos_d
     return lines
 
 
-def _build_branch(seg_indices, body_positions, hinge_dampings, joint_axes, reversed_dir, indent, imu_stiffness_damping=None):
+def _build_branch(seg_indices, body_positions, hinge_dampings, joint_axes, reversed_dir, indent, imu_stiffness_damping=None, seg_dof_types=None):
     """Recursively build nested body XML for a chain branch."""
     if not seg_indices:
         return []
@@ -414,16 +515,29 @@ def _build_branch(seg_indices, body_positions, hinge_dampings, joint_axes, rever
     geom_x = -SEG_GEOM_OFFSET if reversed_dir else SEG_GEOM_OFFSET
     imu_x = geom_x
 
+    seg_dof = seg_dof_types[seg] if seg_dof_types else 1
+
     lines = []
     lines.append(f'{indent}<body name="{seg}" pos="{_fmt(pos)}">')
-    lines.append(
-        f'{indent}  <joint name="j_{seg}_pri" type="hinge"'
-        f' axis="{_fmt(pri_axis)}" damping="{damp}"/>'
-    )
-    lines.append(
-        f'{indent}  <joint name="j_{seg}_res" type="hinge"'
-        f' axis="{_fmt(res_axis)}" range="-7.5 7.5" damping="{damp}"/>'
-    )
+    if seg_dof == 1:
+        lines.append(
+            f'{indent}  <joint name="j_{seg}_pri" type="hinge"'
+            f' axis="{_fmt(pri_axis)}" damping="{damp}"/>'
+        )
+    elif seg_dof == 2:
+        lines.append(
+            f'{indent}  <joint name="j_{seg}_h1" type="hinge"'
+            f' axis="{_fmt(pri_axis)}" damping="{damp}"/>'
+        )
+        lines.append(
+            f'{indent}  <joint name="j_{seg}_h2" type="hinge"'
+            f' axis="{_fmt(res_axis)}" damping="{damp}"/>'
+        )
+    elif seg_dof == 3:
+        lines.append(
+            f'{indent}  <joint name="j_{seg}_ball" type="ball"'
+            f' stiffness="100" damping="{damp}"/>'
+        )
     lines.append(
         f'{indent}  <geom type="box" size="{SEG_HALF_SIZE}"'
         f' mass="{SEG_MASS}" pos="{geom_x} 0 0"/>'
@@ -440,14 +554,14 @@ def _build_branch(seg_indices, body_positions, hinge_dampings, joint_axes, rever
 
     # Nested children
     lines.extend(
-        _build_branch(remaining, body_positions, hinge_dampings, joint_axes, reversed_dir, indent + "  ", imu_stiffness_damping)
+        _build_branch(remaining, body_positions, hinge_dampings, joint_axes, reversed_dir, indent + "  ", imu_stiffness_damping, seg_dof_types)
     )
 
     lines.append(f"{indent}</body>")
     return lines
 
 
-def build_chain_xml(anchor_idx, dt, body_positions=None, hinge_dampings=None, joint_axes=None, cor=True, imu_stiffness_damping=None):
+def build_chain_xml(anchor_idx, dt, body_positions=None, hinge_dampings=None, joint_axes=None, cor=True, imu_stiffness_damping=None, seg_dof_types=None):
     """Build MJCF XML for a 4-segment chain with the given anchor as root.
 
     Args:
@@ -462,6 +576,8 @@ def build_chain_xml(anchor_idx, dt, body_positions=None, hinge_dampings=None, jo
             (rot_stiffness, rot_damping, pos_stiffness, pos_damping). When
             provided, adds ball + 3 slide joints to IMU bodies for motion
             artifacts. When None, IMUs are rigidly attached.
+        seg_dof_types: Dict mapping segment name to DOF (1, 2, or 3).
+            When None, defaults to 1-DOF hinge for all non-anchor segments.
 
     Returns:
         MJCF XML string.
@@ -543,19 +659,24 @@ def build_chain_xml(anchor_idx, dt, body_positions=None, hinge_dampings=None, jo
 
         branch_indent = "      "
 
-    # Collect hinge joints from branch segments
+    # Collect actuated joints from branch segments (ball joints use spring/damper, not actuators)
     for idx in left + right:
         seg = SEGMENTS[idx]
-        actuated_joints.append((f"j_{seg}_pri", "hinge"))
-        actuated_joints.append((f"j_{seg}_res", "hinge"))
+        seg_dof = seg_dof_types[seg] if seg_dof_types else 1
+        if seg_dof == 1:
+            actuated_joints.append((f"j_{seg}_pri", "hinge"))
+        elif seg_dof == 2:
+            actuated_joints.append((f"j_{seg}_h1", "hinge"))
+            actuated_joints.append((f"j_{seg}_h2", "hinge"))
+        # 3-DOF ball joints: no actuator (tracked via qpos_spring)
 
     # Left branch (reversed)
     lines.extend(
-        _build_branch(left, body_positions, hinge_dampings, joint_axes, True, branch_indent, imu_stiffness_damping)
+        _build_branch(left, body_positions, hinge_dampings, joint_axes, True, branch_indent, imu_stiffness_damping, seg_dof_types)
     )
     # Right branch (original direction)
     lines.extend(
-        _build_branch(right, body_positions, hinge_dampings, joint_axes, False, branch_indent, imu_stiffness_damping)
+        _build_branch(right, body_positions, hinge_dampings, joint_axes, False, branch_indent, imu_stiffness_damping, seg_dof_types)
     )
 
     if cor:
@@ -649,12 +770,26 @@ def _generate_one(
     hinge_dampings = {}
     for seg in SEGMENTS:
         if randomize_joint_params:
-            hinge_dampings[seg] = float(rng.uniform(1.0, 10.0))
+            hinge_dampings[seg] = float(rng.uniform(0.5, 10.0))
         else:
             hinge_dampings[seg] = DEFAULT_HINGE_DAMPING
 
     # Generate random perpendicular axes per segment (rr_imp joint)
     joint_axes = {seg: _random_perpendicular_axes(rng) for seg in SEGMENTS}
+
+    # Randomize DOF per non-anchor segment: 50% 3-DOF, 25% 2-DOF, 25% 1-DOF
+    seg_dof_types = {}
+    for i, seg in enumerate(SEGMENTS):
+        if i == anchor_idx:
+            seg_dof_types[seg] = 3  # anchor always 3-DOF (root ball)
+        else:
+            r = rng.random()
+            if r < 0.50:
+                seg_dof_types[seg] = 3
+            elif r < 0.75:
+                seg_dof_types[seg] = 2
+            else:
+                seg_dof_types[seg] = 1
 
     # Sample IMU stiffness/damping if motion artifacts enabled
     imu_sd = None
@@ -662,26 +797,20 @@ def _generate_one(
         imu_sd = _sample_imu_stiffness_damping(rng, prob_rigid, all_rigid_or_flex)
 
     # Build model (use smaller physics timestep when substeps > 1)
-    xml = build_chain_xml(anchor_idx, dt_phys, body_positions, hinge_dampings, joint_axes, imu_stiffness_damping=imu_sd)
+    xml = build_chain_xml(anchor_idx, dt_phys, body_positions, hinge_dampings, joint_axes, imu_stiffness_damping=imu_sd, seg_dof_types=seg_dof_types)
     model = mogen.Model(xml)
 
     # Motion config
     preset = motion_presets[config_name]
     motion = _build_motion_dict(preset, model)
 
-    # Generate reference trajectory at output rate
+    # Generate reference trajectory at output rate (with warmup prefix)
     sensors = mogen.SensorConfig(imus=IMUS)
     control = mogen.ControlConfig(kinematic=False, substeps=substeps)
     joint_info = _extract_joint_info(model.mj_model)
-    duration = n_timesteps * dt
+    total_steps = n_timesteps + WARMUP_STEPS
+    duration = total_steps * dt
     q_ref = generate_q_ref(motion, joint_info, duration, dt, rng)
-
-    # Post-process residual trajectories: scale to ±7.5° and center
-    for ji in joint_info:
-        if ji["name"].endswith("_res"):
-            adr = ji["qpos_adr"]
-            q_ref[:, adr] = q_ref[:, adr] * (np.deg2rad(7.5) / np.pi)
-            q_ref[:, adr] -= np.mean(q_ref[:, adr])
 
     # Forward simulation
     traj = simulate(model, q_ref, motion, sensors, control)
@@ -689,25 +818,27 @@ def _generate_one(
     body_quat_rec = traj.body_quat_array
     mj_model = model.mj_model
 
-    # ── Build per-segment SegmentData ──
+    # ── Build per-segment SegmentData (trim warmup) ──
     from mogen import SegmentData
 
     seg_data = {}
     for i, seg in enumerate(SEGMENTS):
         imu = IMUS[i]
-        acc = traj.imu[imu]["acc"].astype(np.float32) if traj.imu and imu in traj.imu else np.zeros((n_timesteps, 3), dtype=np.float32)
-        gyr = traj.imu[imu]["gyr"].astype(np.float32) if traj.imu and imu in traj.imu else np.zeros((n_timesteps, 3), dtype=np.float32)
+        acc = traj.imu[imu]["acc"][WARMUP_STEPS:].astype(np.float32) if traj.imu and imu in traj.imu else np.zeros((n_timesteps, 3), dtype=np.float32)
+        gyr = traj.imu[imu]["gyr"][WARMUP_STEPS:].astype(np.float32) if traj.imu and imu in traj.imu else np.zeros((n_timesteps, 3), dtype=np.float32)
 
         # Body quaternion (body-to-world, matching ring convention)
         bid = mujoco.mj_name2id(mj_model, mujoco.mjtObj.mjOBJ_BODY, seg)
-        quat = body_quat_rec[:, bid].copy()
+        quat = body_quat_rec[WARMUP_STEPS:, bid].copy()
 
-        dof = None
-        ja = None
-        if i > 0:  # non-root segments (seg3, seg4, seg5)
-            pri_axis, _res_axis = joint_axes[seg]
-            dof = 1
+        dof = seg_dof_types[seg]
+        pri_axis, res_axis = joint_axes[seg]
+        if dof == 1:
             ja = pri_axis.astype(np.float32)
+        elif dof == 2:
+            ja = np.concatenate([pri_axis, res_axis]).astype(np.float32)
+        else:  # 3-DOF
+            ja = np.zeros(3, dtype=np.float32)
 
         seg_data[seg] = SegmentData(
             acc=acc, gyr=gyr, q=quat.astype(np.float32),
@@ -800,7 +931,7 @@ def main(
     T: float = 150.0,
     randomize_positions: bool = True,
     randomize_joint_params: bool = True,
-    workers: int = 1,
+    workers: int = 0,
     imu_motion_artifacts: bool = False,
     prob_rigid: float = 0.5,
     all_rigid_or_flex: bool = False,
@@ -817,7 +948,7 @@ def main(
         T: Maximum trial length in seconds.
         randomize_positions: Randomize segment positions per sequence.
         randomize_joint_params: Randomize joint damping per sequence.
-        workers: Number of parallel workers (default 1, no multiprocessing).
+        workers: Number of parallel workers (default 0 = all CPU cores; 1 = no multiprocessing).
         imu_motion_artifacts: Add compliant spring-damper joints to IMU
             bodies, producing non-rigid sensor attachment (matches ring's
             --mot-art flag).
@@ -864,6 +995,9 @@ def main(
         ))
 
     mujoco.set_mju_user_warning(_raise_on_warning)
+
+    if workers == 0:
+        workers = multiprocessing.cpu_count()
 
     if workers > 1:
         with multiprocessing.Pool(workers) as pool:

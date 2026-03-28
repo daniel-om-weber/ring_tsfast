@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch_optimizer
 from torch.optim.lr_scheduler import LambdaLR
+from torch.optim import Muon
 from torch.utils.data import ConcatDataset, DataLoader, RandomSampler
 
 from tsfast.models.rnn import SimpleRNN
@@ -22,8 +23,9 @@ from tsfast.tsdata.readers import HDF5Attrs, HDF5Signals
 from tsfast.models.cudagraph import GraphedStatefulModel
 import pytorch_optimizer
 from functools import partial
+from tsfast.training.transforms import bias, noise_grouped
 
-HDF5_DIR = "ring_data_diverse_h5"
+HDF5_DIR = "data_mogen_100_noart"
 BS, EPISODES, LR, TBP = 256, 10000, 1e-3, 150
 N_VAL, RNN_W, RNN_D, LIN_D = 256, 400, 2, 2
 CELLTYPE, LAYERNORM, SEED = "gru", True, 1
@@ -63,6 +65,47 @@ class FeatureConfig:
 
     def getF(self) -> int:
         return max(s.stop for s in self.getSlices().values())
+
+    def make_augmentations(self):
+        """Build bias and noise augmentations matching the 2*F feature layout.
+
+        Each segment's acc and gyr gets its own noise group so the two IMUs
+        receive independently sampled noise levels.
+
+        Noise groups: seg0_acc=0, seg0_gyr=1, seg1_acc=2, seg1_gyr=3, silent=4
+        """
+        ACC_BIAS, GYR_BIAS = 0.15, 0.015          # raw m/s², rad/s
+        ACC_NOISE, GYR_NOISE = 0.03, 0.01         # std_std in raw units
+        SILENT = 4                                 # noise group with std_std=0
+
+        # Build per-segment vectors
+        bias_std = [ACC_BIAS]*3 + [GYR_BIAS]*3
+        noise_idx = [0, 0, 0, 1, 1, 1]            # seg0: acc→g0, gyr→g1
+
+        if self.joint_axes_1d:
+            bias_std += [0.0]*3
+            noise_idx += [SILENT]*3
+        if self.joint_axes_2d:
+            bias_std += [0.0]*6
+            noise_idx += [SILENT]*6
+        if self.dof:
+            bias_std += [0.0]*3
+            noise_idx += [SILENT]*3
+        if self.dt:
+            bias_std += [0.0]
+            noise_idx += [SILENT]
+
+        # Seg1 gets its own groups (offset by 2)
+        noise_idx_seg1 = [g + 2 if g != SILENT else SILENT for g in noise_idx]
+
+        return [
+            bias(std=bias_std * 2, p=0.5),
+            noise_grouped(
+                std_std=[ACC_NOISE, GYR_NOISE, ACC_NOISE, GYR_NOISE, 0.0],
+                std_idx=noise_idx + noise_idx_seg1,
+                p=0.4,
+            ),
+        ]
 
     def make_input_scaler(self) -> StandardScaler:
         F = self.getF()
@@ -237,7 +280,7 @@ class AGCLearner(TbpttLearner):
 # %% Build + Train + Save
 if __name__ == "__main__":
     lam, n_segments = (-1, 0), 2
-    imtp = FeatureConfig(joint_axes_1d=DROP_JA_1D != 1, joint_axes_2d=DROP_JA_2D != 1, dof=DROP_DOF != 1, dt=True)
+    imtp = FeatureConfig(joint_axes_1d=DROP_JA_1D != 1, joint_axes_2d=DROP_JA_2D != 1, dof=DROP_DOF != 1, dt=False)
 
     files = sorted(str(p) for p in Path(HDF5_DIR).glob('*.h5'))
     np.random.shuffle(files)
@@ -248,11 +291,9 @@ if __name__ == "__main__":
 
     sampler = RandomSampler(ds_train, replacement=True, num_samples=BATCHES_PER_EPOCH * BS)
     dl_train = DataLoader(ds_train, batch_size=BS, sampler=sampler, drop_last=True,
-                          num_workers=NUM_WORKERS, persistent_workers=NUM_WORKERS > 0,
-                          pin_memory=True)
+                          num_workers=NUM_WORKERS, pin_memory=True)
     dl_val = DataLoader(ds_val, batch_size=min(len(ds_val), BS),
-                        num_workers=NUM_WORKERS, persistent_workers=NUM_WORKERS > 0, 
-                        pin_memory=True)
+                        num_workers=NUM_WORKERS, pin_memory=True)
     dls = DataLoaders(train=dl_train, valid=dl_val)
     n_epoch = EPISODES // BATCHES_PER_EPOCH
 
@@ -270,14 +311,16 @@ if __name__ == "__main__":
     learner = AGCLearner(
         model=model_graphed, dls=dls, loss_func=rnno_loss_factory(lam, n_segments),
         # opt_func=lambda params, lr: torch_optimizer.Lamb(params, lr=lr, weight_decay=0.0), 
-        opt_func=partial(pytorch_optimizer.Ranger, betas=(0.95, 0.99), eps=1e-6, weight_decay=0.01, use_gc=False),
-    
+        # opt_func=partial(pytorch_optimizer.Ranger, betas=(0.95, 0.99), eps=1e-6, weight_decay=0.01, use_gc=False),
+        # opt_func= pytorch_optimizer.SOAP,
+        opt_func= pytorch_optimizer.AdamW,
+        augmentations=imtp.make_augmentations(),
         transforms=[], metrics=metrics, grad_clip=None, sub_seq_len=TBP,
         imtp=imtp, drop_ja_1d=DROP_JA_1D)
 
-    learner.fit(n_epoch=n_epoch, lr=LR,
-                scheduler_fn=cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7))
-    # learner.fit_flat_cos(n_epoch=n_epoch,lr=LR,pct_start=0.3)
+    # learner.fit(n_epoch=n_epoch, lr=LR,
+    #             scheduler_fn=cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7))
+    learner.fit_flat_cos(n_epoch=n_epoch,lr=LR,pct_start=0.3)
 
-    torch.save(model, "rnno_v5_diverse_dt.pt")
+    torch.save(model, "rnno_v6_mogen_adamw.pt")
     # learner.save("rnno_learner_v3.pth")
