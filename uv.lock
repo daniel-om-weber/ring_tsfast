@@ -640,6 +640,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dfjimu"
+version = "0.3.0"
+source = { git = "https://github.com/daniel-om-weber/dfjimu.git#31a0345e0ffc26bf6f6f8ee2a5eea3b7364b901e" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[[package]]
 name = "distro"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3137,6 +3146,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+dfjimu = [
+    { name = "dfjimu" },
+    { name = "scipy" },
+]
 imt = [
     { name = "imt-diodem" },
     { name = "imt-imt" },
@@ -3151,6 +3164,7 @@ jax = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dfjimu", marker = "extra == 'dfjimu'", git = "https://github.com/daniel-om-weber/dfjimu.git" },
     { name = "fire", marker = "extra == 'jax'" },
     { name = "imt-diodem", marker = "extra == 'imt'" },
     { name = "imt-imt", marker = "extra == 'imt'", git = "https://github.com/simon-bachhuber/imt.git" },
@@ -3159,13 +3173,14 @@ requires-dist = [
     { name = "onnxruntime-gpu", marker = "extra == 'imt'" },
     { name = "pytorch-optimizer", specifier = ">=3.10.0" },
     { name = "qmt" },
+    { name = "scipy", marker = "extra == 'dfjimu'" },
     { name = "tensorrt-cu12", marker = "extra == 'imt'" },
     { name = "torch" },
     { name = "torch-optimizer" },
-    { name = "tsfast", editable = "../tsfast" },
+    { name = "tsfast", git = "https://github.com/daniel-om-weber/tsfast.git" },
     { name = "wandb", marker = "extra == 'jax'" },
 ]
-provides-extras = ["jax", "imt"]
+provides-extras = ["jax", "imt", "dfjimu"]
 
 [[package]]
 name = "rinoh-typeface-dejavuserif"
@@ -3946,7 +3961,8 @@ wheels = [
 
 [[package]]
 name = "tsfast"
-source = { editable = "../tsfast" }
+version = "0.3.0"
+source = { git = "https://github.com/daniel-om-weber/tsfast.git#798e1eb3f9f8b5599cd2585c97d1704c984db032" }
 dependencies = [
     { name = "h5py" },
     { name = "identibench" },
@@ -3956,40 +3972,6 @@ dependencies = [
     { name = "torch" },
     { name = "tqdm" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "h5py" },
-    { name = "identibench" },
-    { name = "ipykernel", marker = "extra == 'dev'" },
-    { name = "jupytext", marker = "extra == 'dev'" },
-    { name = "matplotlib" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6,<2" },
-    { name = "mkdocs-jupyter", marker = "extra == 'docs'", specifier = ">=0.25" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.27" },
-    { name = "nbmake", marker = "extra == 'dev'" },
-    { name = "numpy" },
-    { name = "onnx", marker = "extra == 'dev'", specifier = ">=1.14" },
-    { name = "onnx", marker = "extra == 'onnx'", specifier = ">=1.14" },
-    { name = "onnxruntime", marker = "python_full_version == '3.10.*' and extra == 'dev'", specifier = ">=1.16,<1.24" },
-    { name = "onnxruntime", marker = "python_full_version == '3.10.*' and extra == 'onnx'", specifier = ">=1.16,<1.24" },
-    { name = "onnxruntime", marker = "python_full_version >= '3.11' and extra == 'dev'", specifier = ">=1.16" },
-    { name = "onnxruntime", marker = "python_full_version >= '3.11' and extra == 'onnx'", specifier = ">=1.16" },
-    { name = "onnxscript", marker = "extra == 'dev'", specifier = ">=0.1" },
-    { name = "onnxscript", marker = "extra == 'onnx'", specifier = ">=0.1" },
-    { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-cov", marker = "extra == 'dev'" },
-    { name = "ray", extras = ["tune"], marker = "extra == 'dev'" },
-    { name = "ray", extras = ["tune"], marker = "extra == 'tune'" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scipy" },
-    { name = "torch", specifier = ">=2.1" },
-    { name = "tqdm" },
-    { name = "twine", marker = "extra == 'dev'" },
-]
-provides-extras = ["dev", "docs", "onnx", "tune"]
 
 [[package]]
 name = "typer"

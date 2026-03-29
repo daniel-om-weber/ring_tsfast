@@ -24,17 +24,7 @@ from tsfast.models.cudagraph import GraphedStatefulModel
 import pytorch_optimizer
 from functools import partial
 from tsfast.training.transforms import bias, noise_grouped
-
-HDF5_DIR = "data_mogen_100_noart"
-BS, EPISODES, LR, TBP = 256, 10000, 1e-3, 150
-N_VAL, RNN_W, RNN_D, LIN_D = 256, 400, 2, 2
-CELLTYPE, LAYERNORM, SEED = "gru", True, 1
-DROP_JA_1D, DROP_JA_2D, DROP_DOF = 1.0, 1.0, 1.0
-BATCHES_PER_EPOCH = 100
-NUM_WORKERS = 2
-
-np.random.seed(SEED)
-torch.manual_seed(SEED)
+import fire
 
 
 # %% FeatureConfig
@@ -247,10 +237,11 @@ def cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7):
 
 # %% AGC Learner (Adaptive Gradient Clipping, matching ring's optax.adaptive_grad_clip)
 class AGCLearner(TbpttLearner):
-    def __init__(self, *args, imtp, drop_ja_1d, **kwargs):
+    def __init__(self, *args, imtp, drop_ja_1d, save_path="rnno_mogen_medium.pt", **kwargs):
         super().__init__(*args, **kwargs)
         self.imtp = imtp
         self.drop_ja_1d = drop_ja_1d
+        self.save_path = save_path
 
     def prepare_batch(self, batch, training=True):
         (imu_raw, attrs_raw), quat_raw = batch
@@ -265,6 +256,12 @@ class AGCLearner(TbpttLearner):
                 xb, yb = a(xb, yb)
         return xb, yb
 
+    def log_epoch(self, epoch, n_epoch, train_loss, val_loss, metrics, pbar):
+        super().log_epoch(epoch, n_epoch, train_loss, val_loss, metrics, pbar)
+        if not hasattr(self, '_best_val_loss') or val_loss < self._best_val_loss:
+            self._best_val_loss = val_loss
+            self.save_model(self.save_path)
+
     def backward_step(self, loss):
         loss.backward()
         for p in self.model.parameters():
@@ -278,27 +275,49 @@ class AGCLearner(TbpttLearner):
         self.opt.zero_grad()
 
 # %% Build + Train + Save
-if __name__ == "__main__":
-    lam, n_segments = (-1, 0), 2
-    imtp = FeatureConfig(joint_axes_1d=DROP_JA_1D != 1, joint_axes_2d=DROP_JA_2D != 1, dof=DROP_DOF != 1, dt=False)
+def main(
+    hdf5_dir: str = "../data/mogen_data",
+    bs: int = 256,
+    episodes: int = 10000,
+    lr: float = 1e-3,
+    tbp: int = 150,
+    n_val: int = 256,
+    rnn_w: int = 400,
+    rnn_d: int = 2,
+    lin_d: int = 2,
+    celltype: str = "gru",
+    layernorm: bool = True,
+    seed: int = 1,
+    drop_ja_1d: float = 1.0,
+    drop_ja_2d: float = 1.0,
+    drop_dof: float = 1.0,
+    batches_per_epoch: int = 100,
+    num_workers: int = 2,
+    save_path: str = "rnno_mogen_medium.pt",
+):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
-    files = sorted(str(p) for p in Path(HDF5_DIR).glob('*.h5'))
+    lam, n_segments = (-1, 0), 2
+    imtp = FeatureConfig(joint_axes_1d=drop_ja_1d != 1, joint_axes_2d=drop_ja_2d != 1, dof=drop_dof != 1, dt=False)
+
+    files = sorted(str(p) for p in Path(hdf5_dir).glob('*.h5'))
     np.random.shuffle(files)
-    train_files, val_files = files[N_VAL:], files[:N_VAL]
+    train_files, val_files = files[n_val:], files[:n_val]
 
     ds_train = ConcatDataset([make_pair_dataset(train_files, p) for p in range(3)])
     ds_val = ConcatDataset([make_pair_dataset(val_files, p) for p in range(3)])
 
-    sampler = RandomSampler(ds_train, replacement=True, num_samples=BATCHES_PER_EPOCH * BS)
-    dl_train = DataLoader(ds_train, batch_size=BS, sampler=sampler, drop_last=True,
-                          num_workers=NUM_WORKERS, pin_memory=True)
-    dl_val = DataLoader(ds_val, batch_size=min(len(ds_val), BS),
-                        num_workers=NUM_WORKERS, pin_memory=True)
+    sampler = RandomSampler(ds_train, replacement=True, num_samples=batches_per_epoch * bs)
+    dl_train = DataLoader(ds_train, batch_size=bs, sampler=sampler, drop_last=True,
+                          num_workers=num_workers, pin_memory=True)
+    dl_val = DataLoader(ds_val, batch_size=min(len(ds_val), bs),
+                        num_workers=num_workers, pin_memory=True)
     dls = DataLoaders(train=dl_train, valid=dl_val)
-    n_epoch = EPISODES // BATCHES_PER_EPOCH
+    n_epoch = episodes // batches_per_epoch
 
-    model = RNNOModel(imtp.getF() * n_segments, n_segments, RNN_W, RNN_D, LIN_D,
-                      CELLTYPE, "layernorm" if LAYERNORM else "")
+    model = RNNOModel(imtp.getF() * n_segments, n_segments, rnn_w, rnn_d, lin_d,
+                      celltype, "layernorm" if layernorm else "")
     model = ScaledModel(model, imtp.make_input_scaler())
 
     model_graphed = GraphedStatefulModel(model)
@@ -310,17 +329,18 @@ if __name__ == "__main__":
 
     learner = AGCLearner(
         model=model_graphed, dls=dls, loss_func=rnno_loss_factory(lam, n_segments),
-        # opt_func=lambda params, lr: torch_optimizer.Lamb(params, lr=lr, weight_decay=0.0), 
+        opt_func=lambda params, lr: torch_optimizer.Lamb(params, lr=lr, weight_decay=0.0),
         # opt_func=partial(pytorch_optimizer.Ranger, betas=(0.95, 0.99), eps=1e-6, weight_decay=0.01, use_gc=False),
         # opt_func= pytorch_optimizer.SOAP,
-        opt_func= pytorch_optimizer.AdamW,
+        # opt_func= pytorch_optimizer.AdamW,
         augmentations=imtp.make_augmentations(),
-        transforms=[], metrics=metrics, grad_clip=None, sub_seq_len=TBP,
-        imtp=imtp, drop_ja_1d=DROP_JA_1D)
+        transforms=[], metrics=metrics, grad_clip=None, sub_seq_len=tbp,
+        imtp=imtp, drop_ja_1d=drop_ja_1d, save_path=save_path)
 
-    # learner.fit(n_epoch=n_epoch, lr=LR,
-    #             scheduler_fn=cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7))
-    learner.fit_flat_cos(n_epoch=n_epoch,lr=LR,pct_start=0.3)
+    learner.fit(n_epoch=n_epoch, lr=lr,
+                scheduler_fn=cosine_decay_schedule_factory(pct_decay=0.95, alpha=1e-7))
+    # learner.fit_flat_cos(n_epoch=n_epoch,lr=lr,pct_start=0.3)
 
-    torch.save(model, "rnno_v6_mogen_adamw.pt")
-    # learner.save("rnno_learner_v3.pth")
+
+if __name__ == "__main__":
+    fire.Fire(main)
