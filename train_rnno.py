@@ -260,7 +260,9 @@ class AGCLearner(TbpttLearner):
         super().log_epoch(epoch, n_epoch, train_loss, val_loss, metrics, pbar)
         if not hasattr(self, '_best_val_loss') or val_loss < self._best_val_loss:
             self._best_val_loss = val_loss
-            self.save_model(self.save_path)
+            # Save the underlying model, not the CUDA graph wrapper
+            inner = self.model.model if isinstance(self.model, GraphedStatefulModel) else self.model
+            torch.save(inner, self.save_path)
 
     def backward_step(self, loss):
         loss.backward()
